@@ -1,81 +1,57 @@
 <?php
-
 namespace App\Http\Controllers\Admin;
-
 use App\Models\Role;
 use App\Models\Permission;
+use App\Forms\Fields\BelongsToManyCheckbox;
+use App\Tables\Columns\BelongsToManyColumn;
 use Merlion\Http\Controllers\CrudController;
-use Illuminate\Http\Request;
-
 class RoleController extends CrudController
 {
     protected string $model = Role::class;
-
     protected function schemas(): array
     {
         $permissions = Permission::all()->pluck('display_name', 'id')->toArray();
-        
         return [
-            'id',
+            'id' => [
+                'name' => 'id',
+                'hideFrom' => 'create,edit',
+            ],
             'name',
             'display_name',
-            'description',
-            [
+            'description' => [
+                'name' => 'description',
+                'type' => 'textarea',
+            ],
+            'permissions' => [
                 'name' => 'permissions',
-                'type' => 'custom_checkbox',
+                'type' => 'belongsToManyCheckbox',
                 'label' => 'Permissions',
                 'options' => $permissions,
-                'description' => 'Select permissions for this role'
-            ]
+                'relationship' => 'permissions',
+                'gridColumns' => 3,
+                'hideFrom' => 'index',
+            ],
         ];
     }
-
+    protected function columns(): array
+    {
+        $columns = parent::columns();
+        $columns[] = BelongsToManyColumn::make('permissions', 'Permissions')
+            ->relationship('permissions', 'display_name')
+            ->limit(3);
+        return $columns;
+    }
     protected function searches(): array
     {
         return ['name', 'display_name'];
     }
-    
-    public function store(...$args)
-    {
-        $request = request();
-        $validated = $request->validate($this->rules());
-        $permissions = $validated['permissions'] ?? [];
-        unset($validated['permissions']);
-        
-        $item = $this->getModel()::create($validated);
-        $item->permissions()->sync($permissions);
-
-        return response()->json([
-            'message' => 'Created successfully',
-            'data' => $item
-        ]);
-    }
-
-    public function update(...$args)
-    {
-        $id = end($args);
-        $request = request();
-        $item = $this->getModel()::findOrFail($id);
-        $validated = $request->validate($this->rules());
-        $permissions = $validated['permissions'] ?? [];
-        unset($validated['permissions']);
-        
-        $item->update($validated);
-        $item->permissions()->sync($permissions);
-
-        return response()->json([
-            'message' => 'Updated successfully',
-            'data' => $item
-        ]);
-    }
-    
     protected function rules(): array
     {
         return [
             'name' => 'required|string|max:255',
             'display_name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'permissions' => 'array'
+            'permissions' => 'array',
         ];
     }
 }
